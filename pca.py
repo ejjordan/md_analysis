@@ -45,5 +45,13 @@ class PCA(object):
         coordsum /= num_confs
         mean = coordsum
         cov -= np.outer(coordsum,coordsum)
-        print cov
-
+        masses = np.repeat(selection.masses(), 3)
+        mass_matrix = np.sqrt(np.identity(len(masses))*masses)
+        cov1 = np.dot(cov,mass_matrix)
+        self.covariance = np.dot(mass_matrix, cov1)
+        eigvals,eigvecs=la.eig(self.covariance)
+        #fh = open('cov.dat','w')
+        #for var in enumerate(self.covariance):
+        #fh.write(self.covariance)
+        #fh.close()
+        return self.covariance
