@@ -48,17 +48,14 @@ class PCA(object):
         #cov3=(1/num_frames)(cov-(1/num_frames)(np.outer(coordsum,coordsum)))
         coordsum /= num_frames
         cov -= np.outer(coordsum,coordsum)
-        #diag_cov=np.diag(cov,K>0)
         masses = np.repeat(selection.masses(), 3)
         mass_matrix = np.sqrt(np.identity(len(masses))*masses)
         #cov1 = np.dot(cov,mass_matrix)
         #self.covariance = np.dot(mass_matrix, cov1)
-        D,V=np.linalg.eig(cov)
-        temp=np.dot(V,D)
-        cov=np.dot(temp,1/V)
-        cov2=cov3.flatten()
-        for j in range(dof):
-            for i in range(0,dof,3):
+        #self.covariance=np.zeros(dof*3,
+        cov2=cov.flatten()
+        for j in range(5):
+            for i in range(0,25,3):
                 print cov2[dof*j+i], cov2[dof*j+i+1], cov2[dof*j+i+2]
         #eigvals,eigvecs=la.eig(self.covariance)
         #fh = open('cov.dat','w')
