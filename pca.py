@@ -39,19 +39,31 @@ class PCA(object):
             selection.atoms.rotate(R[0])
             coords=selection.coordinates().flatten()
             coordsum += coords
-            cov +=np.outer(coords,coords)
-            num_confs+=1
-        cov /= num_confs
-        coordsum /= num_confs
-        mean = coordsum
+            cov += np.outer(coords,coords)
+            #num_confs+=1
+
+        cov /= num_frames            
+        #thing=np.outer(coordsum/num_frames,coordsum/num_frames)
+        #print cov[0],thing[0]
+        #cov3=(1/num_frames)(cov-(1/num_frames)(np.outer(coordsum,coordsum)))
+        coordsum /= num_frames
         cov -= np.outer(coordsum,coordsum)
+        #diag_cov=np.diag(cov,K>0)
         masses = np.repeat(selection.masses(), 3)
         mass_matrix = np.sqrt(np.identity(len(masses))*masses)
-        cov1 = np.dot(cov,mass_matrix)
-        self.covariance = np.dot(mass_matrix, cov1)
-        eigvals,eigvecs=la.eig(self.covariance)
+        #cov1 = np.dot(cov,mass_matrix)
+        #self.covariance = np.dot(mass_matrix, cov1)
+        D,V=np.linalg.eig(cov)
+        temp=np.dot(V,D)
+        cov=np.dot(temp,1/V)
+        cov2=cov3.flatten()
+        for j in range(dof):
+            for i in range(0,dof,3):
+                print cov2[dof*j+i], cov2[dof*j+i+1], cov2[dof*j+i+2]
+        #eigvals,eigvecs=la.eig(self.covariance)
         #fh = open('cov.dat','w')
         #for var in enumerate(self.covariance):
         #fh.write(self.covariance)
         #fh.close()
-        return self.covariance
+        #return self.covariance
+
