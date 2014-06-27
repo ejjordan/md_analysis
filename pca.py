@@ -50,6 +50,7 @@ class PCA(object):
         cov -= np.outer(coordsum,coordsum)
         masses = np.repeat(selection.masses(), 3)
         mass_matrix = np.sqrt(np.identity(len(masses))*masses)
+
         #cov1 = np.dot(cov,mass_matrix)
         #self.covariance = np.dot(mass_matrix, cov1)
         #self.covariance=np.zeros(dof*3,
