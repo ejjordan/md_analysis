@@ -96,4 +96,4 @@ class analyzer(object):
                            Ca2Cb1_dist=0.75, dihedral=0.35):
         vector_list=[self.universe.selectAtoms("name CA").coordinates(),
                      self.universe.selectAtoms("name CB").coordinates()]
-        print vector_list
+        print vector_list[0]
