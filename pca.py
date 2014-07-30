@@ -21,7 +21,6 @@ class PCA(object):
     
     def make_covariance(self):
         selection = self.universe.selectAtoms(self.selection)
-        #reference = self.universe.selectAtoms(self.selection)
         ref="ref.gro"
         gro_writer=MDAnalysis.coordinates.GRO.GROWriter(self.targetdir+ref)
         gro_writer.write(self.universe,0)
@@ -33,47 +32,59 @@ class PCA(object):
         
         print "covariancs matrix will have shape {0} from {1} frames".format(np.shape(cov),num_frames)
         
-        #num_confs=0
         coordsum=np.zeros(dof)
+        avg_struc=np.zeros(num_atoms,3)
         for ts in self.universe.trajectory:
             analysis.align.alignto(selection,reference,mass_weighted=True)
             coords = selection.coordinates().flatten()
             coordsum += coords
             cov += np.outer(coords,coords)
-
-            # mobile = selection.coordinates() - selection.centerOfMass()
-            # ref = reference.coordinates() -reference.centerOfMass()
-            # R = analysis.align.rotation_matrix(mobile,ref)
-            # selection.atoms.translate(-selection.centerOfMass())
-            # selection.atoms.rotate(R[0])
-            # selection.atoms.translate(reference.centerOfMass())
-            # coords = selection.coordinates().flatten()
-            # coordsum += coords
-            # cov += np.outer(coords,coords)
-        import matplotlib
+            avg_struc += selection.coordinates()
         cov /= num_frames            
         coordsum /= num_frames
+        avg_struc /= num_frames
+        self.average_structure=avg_struc
         cov -= np.outer(coordsum,coordsum)
-        plt.imshow(cov,cmap=matplotlib.cm.binary)
-        plt.show()
-        return cov
+        self.covariance=cov
+        self.eigvals,self.eigvecs=la.eig(self.covariance)
 
+    def get_covariance(self):
+        return self.covariance
 
-"""    
-        masses = np.repeat(selection.masses(), 3)
-        mass_matrix = np.sqrt(np.identity(len(masses))*masses)
-        #cov1 = np.dot(cov,mass_matrix)
-        #self.covariance = np.dot(mass_matrix, cov1)
-        cov2=cov.flatten()
-        #print cov[0]
-        for j in range(1):
-            for i in range(0,15,3):
-                pass
-                #print cov2[dof*j+i], cov2[dof*j+i+1], cov2[dof*j+i+2]
-        #eigvals,eigvecs=la.eig(self.covariance)
-        #fh = open('cov.dat','w')
-        #for var in enumerate(self.covariance):
-        #fh.write(self.covariance)
-        #fh.close()
-        #return self.covariance
+    def get_eigenvalues(self):
+        return self.eigvals
+
+    def get_eigenvectors(self):
+        return self.eigvecs
+
+    def get_average_structure(self):
+        return self.average_structure
+
+"""
+    def make_PCA_traj(self, pca_file="PCA.xtc"):
+        from xdrfile.TRR import TRRReader, TRRWriter, Timestep
+
+        # 'modes' is a mode object with M PCs, similar to a MxNx3 array
+        # 'xav' the average coordinates, a Nx3 array for N atoms
+
+        N = len(self.average_structure)   # number of atoms
+
+        W = Writer(self.targetdir + pca_file, numatoms=N)            # TRR writer
+        ts = MDAnalysis.coordinates.TRR.Timestep(N)  # TRR time step
+
+        for frame,mode in enumerate(self.eigvecs[0:9]):
+            ts.lmbda = -1
+            if frame<=1:
+                ts._pos[:] = xav
+            else:
+                ts._pos[:] = mode.scaledToNorm(1.).array*10   # nm to angstroms
+                ts.frame = frame         # manually change the frame number
+                ts.step = frame - 1
+                if frame <= 1:
+                    ts.time = frame-1
+                else:
+                    ts.time = mode.frequency
+                    W.write(ts)             # converts angstrom to nm for gmx
+
+        W.close()
 """
