@@ -94,6 +94,33 @@ class analyzer(object):
 
     def make_surface_graph(self, CaCa_dist=0.6, Ca1Cb2_dist=0.75,
                            Ca2Cb1_dist=0.75, dihedral=0.35):
+        import scipy.spatial.distance as dist
         vector_list=[self.universe.selectAtoms("name CA").coordinates(),
-                     self.universe.selectAtoms("name CB").coordinates()]
-        print vector_list[0]
+                     self.universe.selectAtoms("name N and resname GLY or name CB").coordinates()]
+        close_calphas=[]
+        for calpha1_index in range(len(vector_list[0])):
+            for calpha2_index in range(len(vector_list[0])):
+                calpha1=vector_list[0][calpha1_index]
+                calpha2=vector_list[0][calpha2_index]
+                calphas_distance=dist.euclidean(calpha1,calpha2)
+                if calphas_distance<10:
+                    if calphas_distance==0:
+                        continue
+                    calpha1_resname=self.universe.selectAtoms("resid {0}".format(calpha1_index))
+                    calpha2_resname=self.universe.selectAtoms("resid {0}".format(calpha1_index))
+                    cbeta1=vector_list[1][calpha1_index]
+                    cbeta2=vector_list[1][calpha2_index]
+                    cbetas_distance=dist.euclidean(cbeta1,cbeta2)
+                    calpha1_cbeta2_dist=dist.euclidean(calpha1,cbeta2)
+                    calpha2_cbeta1_dist=dist.euclidean(calpha2,cbeta1)
+                    #dihedral=MDAnalysis.core.distances.calc_torsions(calpha1,cbeta1,calpha2,cbeta2)
+                    close_calphas.append([calpha1_index,calpha1_resname,
+                                          calpha1,calpha2_index,
+                                          calpha2_resname,  calpha2,cbeta1,
+                                          cbeta2,calphas_distance,
+                                          cbetas_distance,calpha1_cbeta2_dist,
+                                          calpha2_cbeta1_dist])#,dihedral])
+        self.calphas=vector_list[0]
+        self.cbetas=vector_list[1]
+        self.close_calphas=close_calphas
+        
