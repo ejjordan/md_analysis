@@ -16,7 +16,7 @@ is_psf=True
 for c_dist in c_dist_list:
     for non_c_dist in non_c_dist_list:
         for mutation in mutation_list:
-            print "analyzing {0}_{1}_{2}_{3} system".format(mutation,c_dist,
+            print "\nanalyzing {0}_{1}_{2}_{3} system".format(mutation,c_dist,
                                                             non_c_dist,dt)
             psf='alk.dry.{0}.psf'.format(mutation)
             dcd='alk.140ns.aligned.dry.{0}.dcd'.format(mutation)
