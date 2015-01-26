@@ -3,62 +3,79 @@ from MDAnalysis import *
 import MDAnalysis
 import MDAnalysis.analysis as analysis
 import numpy as np
-import os
+import os,sys
 import matplotlib.pylab as plt
+import gzip
 
 class PCA(object):
     """perform principal component analysis"""
-    def __init__(self, topology, trajectory, selection='protein and backbone', 
-                 targetdir=os.path.curdir):
+    def __init__(self, topology, trajectory, align_selection='name CA',
+                 pca_selection="name CA", start_frame=0, last_frame=None, 
+                 targetdir=os.path.curdir, skip=None, outname=None):
         self.topology = topology
         self.trajectory = trajectory
         self.targetdir = targetdir
-        self.selection = selection
-        trajbase = os.path.splitext(os.path.basename(trajectory))[0]
-        output = trajbase + '_pca.dat'
-        self.output = os.path.join(self.targetdir, output)
+        self.skip = skip
+        #trajbase = os.path.splitext(os.path.basename(trajectory))[0]
+        #output = trajbase + '_pca.dat'
+        self.output = self.targetdir + "/" + outname
+        self.start_frame=start_frame
+        self.last_frame=last_frame
         self.universe = Universe(topology, trajectory)
+        self.universe.trajectory.start_timestep=self.start_frame
+        if last_frame is not None:
+            self.universe.trajectory.numframes=self.last_frame
+        self.align_selection = align_selection
+        self.pca_selection = self.universe.selectAtoms(pca_selection)
+
     
     def make_covariance(self):
-        selection = self.universe.selectAtoms(self.selection)
+        align_selection = self.universe.selectAtoms(self.align_selection)
         ref="ref.gro"
         gro_writer=MDAnalysis.coordinates.GRO.GROWriter(self.targetdir+ref)
         gro_writer.write(self.universe,0)
-        reference=Universe(self.targetdir+ref).selectAtoms(self.selection)
-        num_atoms=selection.numberOfAtoms()
+        reference=Universe(self.targetdir+ref).selectAtoms(self.align_selection)
+        num_atoms=self.pca_selection.numberOfAtoms()
         num_frames=self.universe.trajectory.numframes
         dof=num_atoms*3
         cov=np.zeros((dof,dof))
-        
         print "covariancs matrix will have shape {0} from {1} frames".format(np.shape(cov),num_frames)
-        
         coordsum=np.zeros(dof)
-        avg_struc=np.zeros(num_atoms,3)
+        avg_struc=np.zeros((num_atoms,3))
         for ts in self.universe.trajectory:
-            analysis.align.alignto(selection,reference,mass_weighted=True)
-            coords = selection.coordinates().flatten()
+            frame_num=self.universe.trajectory.frame
+            if (frame_num % 10) == 0:
+                sys.stdout.flush()
+                sys.stdout.write('\rPCA [step {0}]  '.format(frame_num))
+            if self.skip:
+                self.universe.trajectory.skip=self.skip
+            analysis.align.alignto(align_selection,reference,mass_weighted=True)
+            coords = self.pca_selection.coordinates().flatten()
             coordsum += coords
             cov += np.outer(coords,coords)
-            avg_struc += selection.coordinates()
+            avg_struc += self.pca_selection.coordinates()
         cov /= num_frames            
         coordsum /= num_frames
         avg_struc /= num_frames
         self.average_structure=avg_struc
         cov -= np.outer(coordsum,coordsum)
         self.covariance=cov
-        self.eigvals,self.eigvecs=la.eig(self.covariance)
+        print "\ncomputing eigenvectors and eigenvalues"
+        self.eigvals,self.eigvecs=la.eig(np.array(self.covariance))
 
-    def get_covariance(self):
-        return self.covariance
+    def write_data(self):
+        fp=open("{0}_eigenvals.dat".format(self.output), 'w')
+        for i in range(len(self.eigvals)):
+            fp.write("{0}\n".format(self.eigvals[i]))
+        fp.close()
+        fp=gzip.GzipFile("{0}_eigenvecs.gz".format(self.output), 'wb')
+        for i in range(len(self.eigvecs)):
+            for j in range(len(self.eigvecs[i])):
+                fp.write("{0} ".format(self.eigvecs[i][j]))
+            fp.write("\n")
+        fp.close()
 
-    def get_eigenvalues(self):
-        return self.eigvals
 
-    def get_eigenvectors(self):
-        return self.eigvecs
-
-    def get_average_structure(self):
-        return self.average_structure
 
 """
     def make_PCA_traj(self, pca_file="PCA.xtc"):

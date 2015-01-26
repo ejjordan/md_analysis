@@ -19,30 +19,41 @@ It is currently a work in progress!
 
 class analyzer(object):
 
-    def __init__(self, topology, trajectory, path=os.getcwd()):
-        self.path = path + '/'
+    def __init__(self,topology,trajectory,start_frame=0,last_frame=None,
+                 out_path=os.getcwd(),out_file=None):
+        self.out_path = out_path + '/'
         self.trajectory = trajectory
         self.topology = topology
-        self.universe = MDAnalysis.Universe(self.path + self.topology,
-                                            self.path + self.trajectory)
+        self.start_frame=start_frame
+        self.last_frame=last_frame
+        self.universe = MDAnalysis.Universe(self.topology, self.trajectory)
+        self.out_file=out_file
+        self.universe.trajectory.start_timestep=self.start_frame
+        if last_frame is not None:
+            self.universe.trajectory.numframes=self.last_frame
 
     def get_rms(self, ref_name="frame0.gro"):
         self.ref_name = ref_name
-        gro_writer=MDAnalysis.coordinates.GRO.GROWriter(self.path
+        gro_writer=MDAnalysis.coordinates.GRO.GROWriter(self.out_path
                                                         + self.ref_name)
         gro_writer.write(self.universe,0)
-        self.ref_struct=Universe(self.path+self.ref_name)
+        self.ref_struct=Universe(self.out_path+self.ref_name)
         rms_fit_trj(self.universe,self.ref_struct,
                     {'mobile':'backbone', 'reference':'backbone'},
-                    filename=None,rmsdfile=self.path + "fit.dat")
-        os.remove(sys.path + "rmsfit_" + self.trajectory) #remove fitted traj
+                    filename=None, rmsdfile=self.out_path +
+                    self.out_file + "_fit.dat")
+        #os.remove(self.path + "rmsfit_" + self.trajectory) #remove fitted traj
 
-
-    def get_sasa(self, dssp_loc="/usr/bin/mkdssp"):
+    def get_sasa(self, dssp_loc="/usr/bin/mkdssp",skip=None):
         self.dssp_loc = dssp_loc
         SASA={}
         protein=self.universe.selectAtoms("protein")
         for ts in self.universe.trajectory:
+            if skip:
+                self.universe.trajectory.skip=skip
+            sys.stdout.flush()
+            sys.stdout.write('\rsasa [step {0}]  '.format(
+                    self.universe.trajectory.frame))
             writer=MDAnalysis.Writer("tmp.pdb")
             writer.write(protein)
             writer.close()
@@ -57,70 +68,76 @@ class analyzer(object):
                 else:
                     SASA[resnum.id[1]]=[sasa]
         count=0
+        fp=open(self.out_path +self.out_file+ "_sasa.dat",'w')
         for key in SASA:
-            print protein.resnames()[count],key,np.mean(SASA[key]),np.std(SASA[key],ddof=1)
+            fp.write("{0}\t{1}\t{2}\t{3}\n".format(protein.resnames()[count],key,np.mean(SASA[key]),np.std(SASA[key],ddof=1)))
             count+=1
+        fp.close()
+        sys.stdout.write('\rSASA table created     ')
+        print
 
 
-    def get_salts(self):
+    def get_salts_lame(self):
+        """
+        This version of the get salts routine uses the MDAnalysis contact
+        analysis routine. It is functional but the output is clunky so it
+        should only be used if you want to learn how to parse this output.
+        """
         ions = self.universe.selectAtoms("type NA") + self.universe.selectAtoms("type CL")
         sel_basic = "(resname ARG or resname LYS) and (name NH* or name NZ)"
         sel_acidic = "(resname ASP or resname GLU) and (name OE* or name OD*)"
         basic=self.universe.selectAtoms(sel_basic)
         acidic=self.universe.selectAtoms(sel_acidic)
         #set up analysis of native contacts ("salt bridges"); with distance <6 A
-        CA1 = MDAnalysis.analysis.contacts.ContactAnalysis1(self.universe, selection=(sel_acidic, sel_basic), refgroup=(acidic, basic), radius=3.0, outfile=self.path+"qsalt.dat")
+        CA1 = MDAnalysis.analysis.contacts.ContactAnalysis1(self.universe, selection=(sel_acidic, sel_basic), refgroup=(acidic, basic), radius=3.0, outfile=self.out_path+"qsalt.dat")
         CA1.run(force=True)
-        CA1.plot(self.path+"plot.pdf")
+        return CA1
+        #CA1.plot(self.out_path+"plot.pdf")
 
+    def get_salts(self, distance=4.0, angle=60.0):
+        """
+        This version of the get salts routine usese a modified version of the
+        MDAnalysis hbonds routine. The forcefield type used is 'ion', which
+        includes nitrogens and oxygens in the side chain of HIS, GLN, GLU, 
+        ASP, ARG, and LYS. Note that currently salt bridges to solvent ions
+        will not be found.
+        """
+        sys.path.insert(0,"/home/joe/git/md_analysis/")
+        self.salt_distance=distance
+        self.salt_angle=angle
+        import joe_hbonds as joe
+        salts=joe.HydrogenBondAnalysis(self.universe, 'protein', 'protein',
+                                       update_selection1=True, 
+                                       update_selection2=True, 
+                                       detect_hydrogens='distance', 
+                                       distance = self.salt_distance,
+                                       angle = self.salt_angle, 
+                                       distance_type="heavy",
+                                       forcefield='ion')
+        salts.run()
+        salts_occupancy=salts.count_by_type()
+        salts_occupancy_list=salts_occupancy.tolist()
+        fp=open(self.out_path +self.out_file+ "_salts.dat",'w')
+        for i in range(len(salts_occupancy_list)):
+            fp.write("{0}\n".format(salts_occupancy_list[i]))
+        fp.close()
 
     def get_hbonds(self, distance=3.0, angle=160.0):
-        sys.path.insert(0,"/home/joe/git/python_mdanalysis/mdanalysis/package/MDAnalysis/analysis")
-        self.distance=distance
-        self.angle=angle
+        sys.path.insert(0,"/home/joe/git/md_analysis/")
         import joe_hbonds as joe
+        self.hbond_distance=distance
+        self.hbond_angle=angle
         hbonds=joe.HydrogenBondAnalysis(self.universe, 'protein', 'protein',
                                         update_selection1=True, 
                                         update_selection2=True, 
                                         detect_hydrogens='distance', 
-                                        distance = self.distance,
-                                        angle = self.angle, 
+                                        distance = self.hbond_distance,
+                                        angle = self.hbond_angle, 
                                         distance_type="heavy")
         hbonds.run()
         hbonds_occupancy=hbonds.count_by_type()
-        print hbonds_occupancy[0]
-        hbonds_occupancy.generate_table()
-        hbonds_occupancy.save_table(self.path+"hbonds-occupancy.pickle")
-
-    def make_surface_graph(self, CaCa_dist=0.6, Ca1Cb2_dist=0.75,
-                           Ca2Cb1_dist=0.75, dihedral=0.35):
-        import scipy.spatial.distance as dist
-        vector_list=[self.universe.selectAtoms("name CA").coordinates(),
-                     self.universe.selectAtoms("name N and resname GLY or name CB").coordinates()]
-        close_calphas=[]
-        for calpha1_index in range(len(vector_list[0])):
-            for calpha2_index in range(len(vector_list[0])):
-                calpha1=vector_list[0][calpha1_index]
-                calpha2=vector_list[0][calpha2_index]
-                calphas_distance=dist.euclidean(calpha1,calpha2)
-                if calphas_distance<10:
-                    if calphas_distance==0:
-                        continue
-                    calpha1_resname=self.universe.selectAtoms("resid {0}".format(calpha1_index))
-                    calpha2_resname=self.universe.selectAtoms("resid {0}".format(calpha1_index))
-                    cbeta1=vector_list[1][calpha1_index]
-                    cbeta2=vector_list[1][calpha2_index]
-                    cbetas_distance=dist.euclidean(cbeta1,cbeta2)
-                    calpha1_cbeta2_dist=dist.euclidean(calpha1,cbeta2)
-                    calpha2_cbeta1_dist=dist.euclidean(calpha2,cbeta1)
-                    #dihedral=MDAnalysis.core.distances.calc_torsions(calpha1,cbeta1,calpha2,cbeta2)
-                    close_calphas.append([calpha1_index,calpha1_resname,
-                                          calpha1,calpha2_index,
-                                          calpha2_resname,  calpha2,cbeta1,
-                                          cbeta2,calphas_distance,
-                                          cbetas_distance,calpha1_cbeta2_dist,
-                                          calpha2_cbeta1_dist])#,dihedral])
-        self.calphas=vector_list[0]
-        self.cbetas=vector_list[1]
-        self.close_calphas=close_calphas
-        
+        hbonds_occupancy_list=hbonds_occupancy.tolist()
+        fp=open(self.out_path +self.out_file+ "_hbonds.dat",'w')
+        for i in range(len(hbonds_occupancy_list)):
+            fp.write("{0}\n".format(hbonds_occupancy_list[i]))
+        fp.close()

@@ -4,13 +4,13 @@ import scipy.stats as stats
 
 #mutation_list=['wt','f1174l','f1245c','f1245v','g1128a','i1170n','i1170s',
 #               'i1171n','m1166r','r1192p','r1275q','t1151m','y1278s']
-mutation_list=['wt','f1174l','d1349h']
+mutation_list=['wt','f1174l','r1275q','d1349h','r1231q']
 directory='./'
 start_res=1084
 #c_dist_list=[4, 4.5 , 5, 5.5, 6]
 #non_c_dist_list=[4, 4.5, 5, 5.5, 6]
-c_dist_list=[4.5]
-non_c_dist_list=[4.5]
+c_dist_list=[4]
+non_c_dist_list=[4]
 dt=50
 
 mutation_info={}
@@ -38,12 +38,22 @@ for c_dist in c_dist_list:
             mutation_info[mutation]=feature_list
 
 
-
+p_vals={}
 control=mutation_info.pop('wt')
 for key in mutation_info.keys():
-    print "\n{0}".format(key)
+    #print "\n{0}".format(key)
+    p_vals[key]=[]
     value=mutation_info[key]
     for i in range(len(value)):
         feature_name=value[i][0]
         t,p=stats.ttest_ind(control[i][3],value[i][3],axis=0)
-        print "{0}:\nt stat = {1} p val = {2}".format(feature_name,t,p)
+        #print "{0}:\nt stat = {1} p val = {2}".format(feature_name,t,p)
+        p_vals[key].append([feature_name,t,p])
+
+values=p_vals.values()
+for i in range(len(values)):
+    for j in range(len(values)/2):
+        if i!=j:
+            print 
+            for k in range(len(values[i])):
+                print values[i][k][0],values[i][k][2],values[j][k][2]

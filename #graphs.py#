@@ -1,7 +1,7 @@
-import MDAnalysis
+cimport MDAnalysis
 import numpy as np
-#from pygraph.classes.graph import graph
-#from pygraph.readwrite.dot import write
+from pygraph.classes.graph import graph
+from pygraph.readwrite.dot import write
 import MDAnalysis.KDTree.NeighborSearch as ns
 import igraph
 import sys

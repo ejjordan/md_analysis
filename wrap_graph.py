@@ -6,21 +6,21 @@ import numpy as np
 
 #mutation_list=['wt','f1174l','f1245c','f1245v','g1128a','i1170n','i1170s']
 #mutation_list=['i1171n','m1166r','r1192p','r1275q','t1151m','y1278s']
-mutation_list=['a1200v','r1231q','g1286r','v1229m']
+mutation_list=['act_wt']
 directory='./40ns-dry/'
 start_res=1084
-c_dist_list=[4, 4.5, 5, 5.5, 6]
+c_dist_list=[4.5, 5, 5.5, 6]
 non_c_dist_list=[4, 4.5, 5, 5.5, 6]
-dt=50
-is_psf=True
+dt=1
+is_psf=False
 
 for c_dist in c_dist_list:
     for non_c_dist in non_c_dist_list:
         for mutation in mutation_list:
             print "\nanalyzing {0}_{1}_{2}_{3} system".format(mutation,c_dist,
                                                             non_c_dist,dt)
-            psf='alk.dry.{0}.psf'.format(mutation)
-            dcd='alk.40ns.dry.{0}.dcd'.format(mutation)
+            psf='alk.dry.{0}.gro'.format(mutation)
+            dcd='alk.40ns.dry.{0}.xtc'.format(mutation)
             out_file_name="{0}_{1}_{2}_{3}".format(mutation,c_dist,non_c_dist,dt)
             universe=mda.Universe(directory+psf,directory+dcd)
             graf=gp.graphs(universe)
